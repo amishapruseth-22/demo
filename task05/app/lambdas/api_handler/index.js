@@ -33,38 +33,32 @@ export const handler = async (event) => {
         const createdAt = new Date().toISOString();
 
         const eventItem = {
-            id: eventId,
-            principalId: Number(inputEvent.principalId),
-            createdAt,
-            body: inputEvent.content
-        };
+             id: eventId,
+                        principalId: Number(inputEvent.principalId),
+                        createdAt,
+                        body: inputEvent.content
+                    };
 
-        console.log("Saving to DynamoDB:", JSON.stringify(eventItem, null, 2));
+                    // Save the event item to DynamoDB
+                    await dynamoDBClient.send(new PutCommand({
+                        TableName: TABLE_NAME,
+                        Item: eventItem,
+                    }));
 
-        const response = await dynamoDBClient.send(new PutCommand({
-            TableName: TABLE_NAME,
-            Item: eventItem,
-        }));
-        console.log("Saved successfully");
+                    // Return a successful response with status code 201
+                    return {
+                        statusCode: 201,
+                        body: JSON.stringify({
+                            message: "Event created successfully",
+                            event: eventItem
+                        })
+                    };
 
-        console.log("DynamoDB Response:", response);
-
-        const responseObject = {
-         statusCode: 201,
-         body: JSON.stringify({
-         statusCode: 200,
-         event: eventItem
-         })
-          };
-
-
-        return responseObject;
-
-    } catch (error) {
-        console.error("Error processing request:", error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ message: "Internal server error", error: error.message })
-        };
-    }
-}; 
+                } catch (error) {
+                    console.error("Error processing request:", error);
+                    return {
+                        statusCode: 500,
+                        body: JSON.stringify({ message: "Internal server error", error: error.message })
+                    };
+                }
+            };
