@@ -1,51 +1,45 @@
-const weatherSDK = require('/opt/weather_sdk'); // Importing the SDK from the Lambda Layer
+const axios = require("axios"); // Ensure this is in the Lambda Layer or package.json
 
 exports.handler = async (event) => {
-    try {
-        console.log("Received event:", JSON.stringify(event, null, 2));
+    console.log("Received event:", JSON.stringify(event, null, 2));
 
-        const path = event.rawPath;
-        const method = event.requestContext.http.method;
+    const path = event?.rawPath || "/";
+    const method = event?.requestContext?.http?.method || "GET";
 
-        if (path === "/weather" && method === "GET") {
-            console.log("Valid request received.");
-
-            const weatherClient = new weatherSDK.WeatherClient();
-            const weatherData = await weatherClient.getForecast(50.4375, 30.5);
-
-            console.log("Weather data:", JSON.stringify(weatherData, null, 2));
+    if (method === "GET" && path === "/weather") {
+        try {
+            const response = await axios.get("https://api.open-meteo.com/v1/forecast?latitude=50.4375&longitude=30.5&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m&current_weather=true");
 
             return {
                 statusCode: 200,
-                body: JSON.stringify(weatherData),
-                headers: { "content-type": "application/json" },
+                body: JSON.stringify(response.data),
+                headers: {
+                    "content-type": "application/json"
+                },
                 isBase64Encoded: false
             };
-        } else {
-            console.error(`Invalid request: path=${path}, method=${method}`);
+        } catch (error) {
+            console.error("Error fetching weather data:", error);
             return {
-                statusCode: 400,
-                body: JSON.stringify({
-                    statusCode: 400,
-                    message: `Bad request syntax or unsupported method. Request path: ${path}. HTTP method: ${method}`
-                }),
-                headers: { "content-type": "application/json" },
+                statusCode: 500,
+                body: JSON.stringify({ message: "Internal Server Error" }),
+                headers: {
+                    "content-type": "application/json"
+                },
                 isBase64Encoded: false
             };
         }
-    } catch (error) {
-        console.error("Error processing request:", error);
+    } else {
         return {
-            statusCode: 500,
+            statusCode: 400,
             body: JSON.stringify({
-                statusCode: 500,
-                message: "Internal Server Error",
-                error: error.message
+                statusCode: 400,
+                message: `Bad request syntax or unsupported method. Request path: ${path}. HTTP method: ${method}`
             }),
-            headers: { "content-type": "application/json" },
+            headers: {
+                "content-type": "application/json"
+            },
             isBase64Encoded: false
         };
     }
 };
-
-
