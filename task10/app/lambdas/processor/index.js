@@ -8,39 +8,48 @@ const dynamoDB = AWSXRay.captureAWSClient(new AWS.DynamoDB.DocumentClient());
 const tableName = process.env.TABLE_NAME;
 
 // Open-Meteo API URL
-const API_URL = "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m)";
+const weatherApiUrl = process.env.WEATHER_API_URL;
 
 exports.handler = async (event) => {
-  const segment = AWSXRay.getSegment().addNewSubsegment("WeatherDataProcessing");
-  console.log("Lambda triggered. Fetching weather data...");
+  console.log("Received event:", JSON.stringify(event, null, 2));
 
-  try {
-    // Fetch weather data from Open-Meteo API
-    const weatherResponse = await axios.get(API_URL);
-    const weatherData = weatherResponse.data;
-    console.log("Weather data fetched:", JSON.stringify(weatherResponse.data));
+      try {
+          // Fetch data from Open-Meteo API
+          const response = await axios.get(weatherApiUrl);
+          const weatherData = response.data;
 
+          // Prepare data for DynamoDB
+          const item = {
+              id: uuidv4(),
+              forecast: weatherData,
+          };
 
-    // Prepare data for DynamoDB
-    const item = {
-      id: uuidv4(),
-      forecast: weatherResponse.data,
-    };
-    console.log("Storing data in DynamoDB:", JSON.stringify(item));
+          // Insert the data into DynamoDB
+          await dynamoDB.put({
+              TableName: tableName,
+              Item: item,
+          }).promise();
 
-    // Store data in DynamoDB
-    await dynamoDB.put({ TableName: tableName, Item: item }).promise();
-     console.log("Data successfully stored in DynamoDB");
-    segment.close();
+          console.log("Successfully stored weather data:", item);
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: "Weather data stored successfully!", data: item }),
-    };
-  } catch (error) {
-    segment.addError(error);
-    segment.close();
-    console.error("Error:", error);
-    return { statusCode: 500, body: JSON.stringify({ message: "Error fetching or storing data", error }) };
-  }
-};
+          // Return success response
+          return {
+              statusCode: 200,
+              body: JSON.stringify({
+                  message: "Weather data stored successfully",
+                  data: item,
+              }),
+          };
+      } catch (error) {
+          console.error("Error:", error);
+
+          // Return error response
+          return {
+              statusCode: 500,
+              body: JSON.stringify({
+                  message: "Failed to store weather data",
+                  error: error.message,
+              }),
+          };
+      }
+  };
